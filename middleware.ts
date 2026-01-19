@@ -61,41 +61,9 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(createRedirectUrl('/login'));
     };
 
-    // Public routes that don't require authentication
-    const publicRoutes = ['/login', '/unauthorized'];
-    
-    // Handle /login route specifically
-    if (pathname === '/login') {
-        // If user is authenticated, redirect them away from login page
-        if (user) {
-            try {
-                const { data: profile, error: profileError } = await supabase
-                    .from('users')
-                    .select('role')
-                    .eq('id', user.id)
-                    .single();
-
-                // Only redirect if we successfully got the profile
-                if (profile && !profileError) {
-                    if (profile.role === 'super_admin') {
-                        return NextResponse.redirect(createRedirectUrl('/admin'));
-                    } else {
-                        return NextResponse.redirect(createRedirectUrl('/dashboard'));
-                    }
-                }
-                // If profile check fails, allow through to prevent loops
-                // User can still see login page even if authenticated (edge case)
-            } catch (error) {
-                // On any error, allow through to prevent loops
-                console.error('Error checking profile for authenticated user on /login:', error);
-            }
-        }
-        // Unauthenticated user or profile check failed - allow through
-        return response;
-    }
-
-    // Handle /unauthorized route
-    if (pathname === '/unauthorized') {
+    // Public routes - completely skip middleware logic to prevent any redirect loops
+    // Let client-side handle authenticated users on login page
+    if (pathname === '/login' || pathname === '/unauthorized') {
         return response;
     }
 

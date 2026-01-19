@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { loginSchema } from '@/lib/validations/schemas';
@@ -12,6 +12,38 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [checkingAuth, setCheckingAuth] = useState(true);
+
+    // Check if user is already authenticated and redirect them
+    useEffect(() => {
+        async function checkAuth() {
+            try {
+                const supabase = createClient();
+                const { data: { user } } = await supabase.auth.getUser();
+                
+                if (user) {
+                    // User is authenticated, check their role and redirect
+                    const { data: profile } = await supabase
+                        .from('users')
+                        .select('role')
+                        .eq('id', user.id)
+                        .single();
+
+                    if (profile?.role === 'super_admin') {
+                        router.replace('/admin');
+                    } else {
+                        router.replace('/dashboard');
+                    }
+                } else {
+                    setCheckingAuth(false);
+                }
+            } catch (error) {
+                // On error, just show login page
+                setCheckingAuth(false);
+            }
+        }
+        checkAuth();
+    }, [router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -64,6 +96,15 @@ export default function LoginPage() {
             setLoading(false);
         }
     };
+
+    // Show loading while checking auth
+    if (checkingAuth) {
+        return (
+            <div className="flex min-h-screen items-center justify-center px-4" style={{ backgroundColor: '#FFF8F0' }}>
+                <div className="text-center" style={{ color: '#777777' }}>Loading...</div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex min-h-screen items-center justify-center px-4" style={{ backgroundColor: '#FFF8F0' }}>
