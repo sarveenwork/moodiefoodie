@@ -7,6 +7,10 @@ export async function middleware(request: NextRequest) {
 
     if (!supabaseUrl || !supabaseAnonKey) {
         console.error('Missing Supabase environment variables in middleware');
+        // Don't redirect if already on login
+        if (request.nextUrl.pathname === '/login') {
+            return NextResponse.next();
+        }
         const url = request.nextUrl.clone();
         url.pathname = '/login';
         return NextResponse.redirect(url);
@@ -27,7 +31,6 @@ export async function middleware(request: NextRequest) {
                     return request.cookies.getAll();
                 },
                 setAll(cookiesToSet: any) {
-                    // Update the response with new cookies
                     response = NextResponse.next({
                         request,
                     });
@@ -39,93 +42,121 @@ export async function middleware(request: NextRequest) {
         }
     );
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    const pathname = request.nextUrl.pathname;
 
-    const { pathname } = request.nextUrl;
+    // ABSOLUTE RULE: Never redirect to /login if already on /login
+    // This is the #1 cause of redirect loops
+    if (pathname === '/login' || pathname === '/unauthorized') {
+        return response;
+    }
 
-    // Check if there are any Supabase auth cookies present
-    // This helps detect if user is in the process of logging in (cookies being set)
+    // Check for ANY Supabase cookies (format: sb-<project-ref>-auth-token or sb-<project-ref>-auth-token.0, etc.)
+    // This is critical to detect when user is in the process of logging in
     const allCookies = request.cookies.getAll();
-    const hasAuthCookies = allCookies.some(cookie => 
-        cookie.name.includes('supabase') || 
-        cookie.name.includes('sb-') ||
-        cookie.name.includes('auth')
+    const hasSupabaseCookies = allCookies.some(cookie => 
+        cookie.name.startsWith('sb-')
     );
 
-    // Check referer to detect if we're coming from login (client-side redirect)
-    const referer = request.headers.get('referer');
-    const comingFromLogin = referer && new URL(referer).pathname === '/login';
+    // Debug logging (remove after fixing)
+    console.log('[Middleware] Path:', pathname);
+    console.log('[Middleware] Has Supabase cookies:', hasSupabaseCookies);
+    if (hasSupabaseCookies) {
+        console.log('[Middleware] Cookie names:', allCookies.filter(c => c.name.startsWith('sb-')).map(c => c.name));
+    }
 
-    // Create URL helpers to avoid redirect loops
+    // Try to get user
+    const {
+        data: { user },
+        error: authError,
+    } = await supabase.auth.getUser();
+
+    console.log('[Middleware] User:', user ? `Found (${user.id})` : 'Not found');
+    if (authError) {
+        console.log('[Middleware] Auth error:', authError.message);
+    }
+
+    // Helper to create redirect URL
     const createRedirectUrl = (path: string) => {
         const url = request.nextUrl.clone();
         url.pathname = path;
         return url;
     };
 
-    // CRITICAL: Never redirect to /login if we're already on /login (prevents loops)
-    // Also, if auth cookies are present or we just came from login, don't redirect (handles race conditions)
+    // Helper to redirect to login - but NEVER if we're already on login or have auth cookies
     const redirectToLogin = () => {
+        // CRITICAL: Never redirect to login if:
+        // 1. We're already on login (shouldn't happen due to early return, but double-check)
+        // 2. We have Supabase auth cookies (user is authenticating)
         if (pathname === '/login') {
-            // Already on login page - don't redirect, just allow through
+            console.log('[Middleware] NOT redirecting: Already on /login');
             return response;
         }
-        // If we just came from login page, don't redirect back (prevents loop from client-side redirects)
-        if (comingFromLogin) {
+        if (hasSupabaseCookies) {
+            console.log('[Middleware] NOT redirecting: Has Supabase cookies');
             return response;
         }
-        // If auth cookies are present, user might be logging in - allow through to prevent race condition
-        if (hasAuthCookies) {
-            return response;
-        }
+        console.log('[Middleware] REDIRECTING to /login from:', pathname);
         return NextResponse.redirect(createRedirectUrl('/login'));
     };
 
-    // Public routes - completely skip middleware logic to prevent any redirect loops
-    // Let client-side handle authenticated users on login page
-    if (pathname === '/login' || pathname === '/unauthorized') {
-        return response;
-    }
-
     // Handle root path
     if (pathname === '/') {
-        if (!user) {
-            return redirectToLogin();
-        }
-        // Authenticated user at root - check their role and redirect appropriately
-        try {
-            const { data: profile } = await supabase
-                .from('users')
-                .select('role')
-                .eq('id', user.id)
-                .single();
+        if (user) {
+            // User is authenticated, redirect based on role
+            try {
+                const { data: profile } = await supabase
+                    .from('users')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single();
 
-            if (profile?.role === 'super_admin') {
-                return NextResponse.redirect(createRedirectUrl('/admin'));
-            } else {
+                if (profile?.role === 'super_admin') {
+                    return NextResponse.redirect(createRedirectUrl('/admin'));
+                } else {
+                    return NextResponse.redirect(createRedirectUrl('/dashboard'));
+                }
+            } catch (error) {
+                // On error, default to dashboard
                 return NextResponse.redirect(createRedirectUrl('/dashboard'));
             }
-        } catch (error) {
-            // If profile check fails, default to dashboard
-            return NextResponse.redirect(createRedirectUrl('/dashboard'));
+        } else {
+            // No user - redirect to login (but check for cookies first)
+            return redirectToLogin();
         }
     }
 
-    // Protected routes - redirect to login if not authenticated
-    // BUT: If auth cookies are present or we came from login, allow through (user might be in process of logging in)
-    // This prevents race conditions where cookies are being set but getUser() hasn't picked them up yet
+    // For protected routes, check authentication
     if (!user) {
-        // If we just came from login or have auth cookies, user is likely authenticating - allow through
-        // The page will handle showing an error if auth truly fails
-        if (comingFromLogin || hasAuthCookies) {
+        // CRITICAL: If we have Supabase cookies, user is likely authenticating
+        // Allow through to prevent race conditions where cookies are set but getUser() hasn't picked them up yet
+        // The page will handle showing errors if auth truly fails
+        if (hasSupabaseCookies) {
+            console.log('[Middleware] Allowing through: Has Supabase cookies');
             return response;
         }
+        
+        // Check if request is coming from login page (client-side redirect)
+        const referer = request.headers.get('referer');
+        console.log('[Middleware] Referer:', referer);
+        if (referer) {
+            try {
+                const refererUrl = new URL(referer);
+                if (refererUrl.pathname === '/login') {
+                    // Coming from login - allow through (user just logged in)
+                    console.log('[Middleware] Allowing through: Coming from /login');
+                    return response;
+                }
+            } catch (e) {
+                // Invalid referer URL, ignore
+            }
+        }
+        
+        // No user, no cookies, and not from login - redirect to login
+        console.log('[Middleware] Redirecting to login: No user, no cookies, not from login');
         return redirectToLogin();
     }
 
-    // For protected routes, check user profile exists
+    // User is authenticated - check profile and role
     let profile;
     try {
         const { data, error: profileError } = await supabase
@@ -135,63 +166,49 @@ export async function middleware(request: NextRequest) {
             .single();
 
         if (profileError) {
-            console.error('Profile fetch error:', profileError);
-            // If it's a not found error, redirect to login (but only if not already on login)
+            // If profile not found, redirect to login (but check cookies first)
             if (profileError.code === 'PGRST116' || profileError.message?.includes('not found')) {
                 return redirectToLogin();
             }
-            // For other errors (network, etc.), allow through to prevent loops
-            // The page component will handle the error
+            // For other errors, allow through - page will handle it
             return response;
         }
 
         profile = data;
         if (!profile) {
-            // Profile doesn't exist - redirect to login (but only if not already on login)
             return redirectToLogin();
         }
     } catch (error) {
+        // On any error, allow through - page will handle it
         console.error('Error checking profile:', error);
-        // On error, allow request through to prevent loops
-        // The page component will handle the error
         return response;
     }
 
     const userRole = (profile as any).role;
 
-    // Super admin routes - only super_admin can access
+    // Super admin routes
     if (pathname.startsWith('/admin')) {
         if (userRole !== 'super_admin') {
             return NextResponse.redirect(createRedirectUrl('/unauthorized'));
         }
-        // Super admin is accessing /admin - allow through
         return response;
     }
 
-    // Company admin only routes - super admin should be redirected to /admin
+    // Company admin routes - redirect super admin away
     const companyAdminRoutes = ['/pos', '/dashboard', '/items', '/orders', '/reports'];
     if (companyAdminRoutes.some(route => pathname.startsWith(route))) {
         if (userRole === 'super_admin') {
-            // Super admin trying to access company admin route - redirect to admin
             return NextResponse.redirect(createRedirectUrl('/admin'));
         }
-        // Company admin accessing their routes - allow through
         return response;
     }
 
-    // All other protected routes - allow through
+    // All other routes - allow through
     return response;
 }
 
 export const config = {
     matcher: [
-        /*
-         * Match all request paths except for the ones starting with:
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         * - public folder
-         */
         '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
 };

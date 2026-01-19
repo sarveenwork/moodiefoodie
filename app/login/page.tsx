@@ -82,11 +82,10 @@ export default function LoginPage() {
                     .single();
 
                 if (profile?.role === 'super_admin') {
-                    router.push('/admin');
+                    router.replace('/admin');
                 } else {
-                    router.push('/dashboard');
+                    router.replace('/dashboard');
                 }
-                router.refresh();
             }
         } catch (err: any) {
             if (err.errors) {
