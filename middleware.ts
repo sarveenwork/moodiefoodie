@@ -1,12 +1,12 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseAnonKey) {
-        console.error('Missing Supabase environment variables in proxy');
+        console.error('Missing Supabase environment variables in middleware');
         return NextResponse.redirect(new URL('/login', request.url));
     }
 
@@ -45,9 +45,11 @@ export async function proxy(request: NextRequest) {
 
     const { pathname } = request.nextUrl;
 
-    // Public routes
-    if (pathname === '/login') {
-        if (user) {
+    // Public routes that don't require authentication
+    const publicRoutes = ['/login', '/unauthorized'];
+    
+    if (publicRoutes.includes(pathname)) {
+        if (pathname === '/login' && user) {
             try {
                 // Check user role to redirect appropriately
                 const { data: profile, error: profileError } = await supabase
@@ -62,11 +64,15 @@ export async function proxy(request: NextRequest) {
                 }
 
                 if (profile) {
-                    if ((profile as any).role === 'super_admin') {
-                        return NextResponse.redirect(new URL('/admin', request.url));
-                    } else {
-                        return NextResponse.redirect(new URL('/dashboard', request.url));
-                    }
+                    const redirectUrl = (profile as any).role === 'super_admin' 
+                        ? new URL('/admin', request.url)
+                        : new URL('/dashboard', request.url);
+                    const redirectResponse = NextResponse.redirect(redirectUrl);
+                    // Copy cookies to redirect response
+                    response.cookies.getAll().forEach((cookie) => {
+                        redirectResponse.cookies.set(cookie.name, cookie.value);
+                    });
+                    return redirectResponse;
                 }
             } catch (error) {
                 // On error, allow login page to show
@@ -77,9 +83,30 @@ export async function proxy(request: NextRequest) {
         return response;
     }
 
+    // Handle root path - redirect based on auth status
+    if (pathname === '/') {
+        if (!user) {
+            const loginUrl = new URL('/login', request.url);
+            const redirectResponse = NextResponse.redirect(loginUrl);
+            // Copy cookies to redirect response
+            response.cookies.getAll().forEach((cookie) => {
+                redirectResponse.cookies.set(cookie.name, cookie.value);
+            });
+            return redirectResponse;
+        }
+        // Let the page.tsx handle the redirect to /dashboard
+        return response;
+    }
+
     // Protected routes - redirect to login if not authenticated
     if (!user) {
-        return NextResponse.redirect(new URL('/login', request.url));
+        const loginUrl = new URL('/login', request.url);
+        const redirectResponse = NextResponse.redirect(loginUrl);
+        // Copy cookies to redirect response
+        response.cookies.getAll().forEach((cookie) => {
+            redirectResponse.cookies.set(cookie.name, cookie.value);
+        });
+        return redirectResponse;
     }
 
     // Check user profile exists
@@ -90,20 +117,38 @@ export async function proxy(request: NextRequest) {
         .single();
 
     if (profileError || !profile) {
-        return NextResponse.redirect(new URL('/login', request.url));
+        const loginUrl = new URL('/login', request.url);
+        const redirectResponse = NextResponse.redirect(loginUrl);
+        // Copy cookies to redirect response
+        response.cookies.getAll().forEach((cookie) => {
+            redirectResponse.cookies.set(cookie.name, cookie.value);
+        });
+        return redirectResponse;
     }
 
     // Super admin routes
     if (pathname.startsWith('/admin')) {
         if ((profile as any).role !== 'super_admin') {
-            return NextResponse.redirect(new URL('/unauthorized', request.url));
+            const unauthorizedUrl = new URL('/unauthorized', request.url);
+            const redirectResponse = NextResponse.redirect(unauthorizedUrl);
+            // Copy cookies to redirect response
+            response.cookies.getAll().forEach((cookie) => {
+                redirectResponse.cookies.set(cookie.name, cookie.value);
+            });
+            return redirectResponse;
         }
     }
 
     // Company admin only routes - super admin should not access these
     if (pathname.startsWith('/pos') || pathname.startsWith('/dashboard') || pathname.startsWith('/items') || pathname.startsWith('/orders') || pathname.startsWith('/reports')) {
         if ((profile as any).role === 'super_admin') {
-            return NextResponse.redirect(new URL('/admin', request.url));
+            const adminUrl = new URL('/admin', request.url);
+            const redirectResponse = NextResponse.redirect(adminUrl);
+            // Copy cookies to redirect response
+            response.cookies.getAll().forEach((cookie) => {
+                redirectResponse.cookies.set(cookie.name, cookie.value);
+            });
+            return redirectResponse;
         }
     }
 
