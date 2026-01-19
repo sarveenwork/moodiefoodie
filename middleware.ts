@@ -1,12 +1,12 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseAnonKey) {
-        console.error('Missing Supabase environment variables in proxy');
+        console.error('Missing Supabase environment variables in middleware');
         return NextResponse.redirect(new URL('/login', request.url));
     }
 
@@ -48,9 +48,28 @@ export async function proxy(request: NextRequest) {
     const publicRoutes = ['/login', '/unauthorized'];
     
     if (publicRoutes.includes(pathname)) {
-        // Don't redirect authenticated users away from login page
-        // Let the client-side handle redirects after login
-        // This prevents redirect loops
+        // If user is authenticated and tries to access login, redirect them to dashboard
+        // This prevents authenticated users from staying on login page
+        if (user && pathname === '/login') {
+            // Check user profile to determine redirect destination
+            try {
+                const { data: profile } = await supabase
+                    .from('users')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single();
+
+                if (profile?.role === 'super_admin') {
+                    return NextResponse.redirect(new URL('/admin', request.url));
+                } else {
+                    return NextResponse.redirect(new URL('/dashboard', request.url));
+                }
+            } catch (error) {
+                // If profile check fails, redirect to dashboard as default
+                return NextResponse.redirect(new URL('/dashboard', request.url));
+            }
+        }
+        // Allow unauthenticated users to access public routes
         return response;
     }
 
