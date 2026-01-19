@@ -26,6 +26,8 @@ export default function ItemsPage() {
     const [showDropdown, setShowDropdown] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<'all' | 'food' | 'drink'>('all');
+    const [submitting, setSubmitting] = useState(false);
+    const [deleting, setDeleting] = useState<string | null>(null);
 
     useEffect(() => {
         loadItems();
@@ -58,6 +60,9 @@ export default function ItemsPage() {
 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
+        if (submitting) return; // Prevent spam clicks
+        
+        setSubmitting(true);
         const formData = new FormData(e.currentTarget);
         const result = editingItem
             ? await updateItem(formData)
@@ -72,6 +77,7 @@ export default function ItemsPage() {
         } else {
             showError(result.error || `Failed to ${editingItem ? 'update' : 'create'} item`);
         }
+        setSubmitting(false);
     }
 
     function handleDeleteClick(itemId: string) {
@@ -80,9 +86,10 @@ export default function ItemsPage() {
     }
 
     async function handleDeleteConfirm() {
-        if (!itemToDelete) return;
+        if (!itemToDelete || deleting === itemToDelete) return; // Prevent spam clicks
 
         setShowDeleteConfirm(false);
+        setDeleting(itemToDelete);
         const formData = new FormData();
         formData.append('id', itemToDelete);
         const result = await deleteItem(formData);
@@ -94,6 +101,7 @@ export default function ItemsPage() {
             showError(result.error || 'Failed to delete item');
         }
         setItemToDelete(null);
+        setDeleting(null);
     }
 
     // Filter items based on search term and category
@@ -344,12 +352,16 @@ export default function ItemsPage() {
                                             </button>
                                             <button
                                                 onClick={() => handleDeleteClick(item.id)}
-                                                className="transition-colors"
-                                                style={{ color: '#FF4C4C', cursor: 'pointer' }}
-                                                onMouseEnter={(e) => e.currentTarget.style.color = '#CC0000'}
-                                                onMouseLeave={(e) => e.currentTarget.style.color = '#FF4C4C'}
+                                                disabled={deleting === item.id}
+                                                className="transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                style={{ 
+                                                    color: deleting === item.id ? '#999999' : '#FF4C4C', 
+                                                    cursor: deleting === item.id ? 'not-allowed' : 'pointer' 
+                                                }}
+                                                onMouseEnter={(e) => deleting !== item.id && (e.currentTarget.style.color = '#CC0000')}
+                                                onMouseLeave={(e) => deleting !== item.id && (e.currentTarget.style.color = '#FF4C4C')}
                                             >
-                                                Delete
+                                                {deleting === item.id ? 'Deleting...' : 'Delete'}
                                             </button>
                                         </td>
                                     </tr>
@@ -438,12 +450,16 @@ export default function ItemsPage() {
                                     </button>
                                     <button
                                         type="submit"
-                                        className="px-4 py-2 text-white rounded-md transition-colors"
-                                        style={{ backgroundColor: '#FF6F3C', cursor: 'pointer' }}
-                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FF8F5C'}
-                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FF6F3C'}
+                                        disabled={submitting}
+                                        className="px-4 py-2 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        style={{ 
+                                            backgroundColor: submitting ? '#ccc' : '#FF6F3C', 
+                                            cursor: submitting ? 'not-allowed' : 'pointer' 
+                                        }}
+                                        onMouseEnter={(e) => !submitting && (e.currentTarget.style.backgroundColor = '#FF8F5C')}
+                                        onMouseLeave={(e) => !submitting && (e.currentTarget.style.backgroundColor = '#FF6F3C')}
                                     >
-                                        {editingItem ? 'Update' : 'Create'}
+                                        {submitting ? (editingItem ? 'Updating...' : 'Creating...') : (editingItem ? 'Update' : 'Create')}
                                     </button>
                                 </div>
                             </form>

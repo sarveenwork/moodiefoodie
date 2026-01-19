@@ -23,6 +23,10 @@ export default function AdminPage() {
     const [showDeleteUserConfirm, setShowDeleteUserConfirm] = useState(false);
     const [companyToDelete, setCompanyToDelete] = useState<string | null>(null);
     const [userToDelete, setUserToDelete] = useState<string | null>(null);
+    const [submittingCompany, setSubmittingCompany] = useState(false);
+    const [submittingUser, setSubmittingUser] = useState(false);
+    const [deletingCompany, setDeletingCompany] = useState<string | null>(null);
+    const [deletingUser, setDeletingUser] = useState<string | null>(null);
 
     useEffect(() => {
         loadData();
@@ -46,6 +50,8 @@ export default function AdminPage() {
 
     async function handleCreateCompany(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
+        if (submittingCompany) return; // Prevent spam clicks
+        setSubmittingCompany(true);
         const formData = new FormData(e.currentTarget);
         const result = await createCompany(formData);
         if (result.success) {
@@ -55,10 +61,13 @@ export default function AdminPage() {
         } else {
             showError(result.error || 'Failed to create company');
         }
+        setSubmittingCompany(false);
     }
 
     async function handleUpdateCompany(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
+        if (submittingCompany) return; // Prevent spam clicks
+        setSubmittingCompany(true);
         const formData = new FormData(e.currentTarget);
         const result = await updateCompany(formData);
         if (result.success) {
@@ -69,10 +78,13 @@ export default function AdminPage() {
         } else {
             showError(result.error || 'Failed to update company');
         }
+        setSubmittingCompany(false);
     }
 
     async function handleCreateUser(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
+        if (submittingUser) return; // Prevent spam clicks
+        setSubmittingUser(true);
         const formData = new FormData(e.currentTarget);
         const result = await createUser(formData);
         if (result.success) {
@@ -82,10 +94,13 @@ export default function AdminPage() {
         } else {
             showError(result.error || 'Failed to create user');
         }
+        setSubmittingUser(false);
     }
 
     async function handleUpdateUser(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
+        if (submittingUser) return; // Prevent spam clicks
+        setSubmittingUser(true);
         const formData = new FormData(e.currentTarget);
         const result = await updateUser(formData);
         if (result.success) {
@@ -97,6 +112,7 @@ export default function AdminPage() {
         } else {
             showError(result.error || 'Failed to update user');
         }
+        setSubmittingUser(false);
     }
 
     function handleDeleteCompanyClick(companyId: string) {
@@ -105,9 +121,10 @@ export default function AdminPage() {
     }
 
     async function handleDeleteCompanyConfirm() {
-        if (!companyToDelete) return;
+        if (!companyToDelete || deletingCompany === companyToDelete) return; // Prevent spam clicks
 
         setShowDeleteCompanyConfirm(false);
+        setDeletingCompany(companyToDelete);
         const formData = new FormData();
         formData.append('id', companyToDelete);
         const result = await deleteCompany(formData);
@@ -119,6 +136,7 @@ export default function AdminPage() {
             showError(result.error || 'Failed to delete company');
         }
         setCompanyToDelete(null);
+        setDeletingCompany(null);
     }
 
     function handleDeleteUserClick(userId: string) {
@@ -127,9 +145,10 @@ export default function AdminPage() {
     }
 
     async function handleDeleteUserConfirm() {
-        if (!userToDelete) return;
+        if (!userToDelete || deletingUser === userToDelete) return; // Prevent spam clicks
 
         setShowDeleteUserConfirm(false);
+        setDeletingUser(userToDelete);
         const formData = new FormData();
         formData.append('id', userToDelete);
         const result = await deleteUser(formData);
@@ -141,6 +160,7 @@ export default function AdminPage() {
             showError(result.error || 'Failed to delete user');
         }
         setUserToDelete(null);
+        setDeletingUser(null);
     }
 
     return (
@@ -266,12 +286,16 @@ export default function AdminPage() {
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteCompanyClick(company.id)}
-                                                        className="transition-colors"
-                                                        style={{ color: '#FF4C4C', cursor: 'pointer' }}
-                                                        onMouseEnter={(e) => e.currentTarget.style.color = '#CC0000'}
-                                                        onMouseLeave={(e) => e.currentTarget.style.color = '#FF4C4C'}
+                                                        disabled={deletingCompany === company.id}
+                                                        className="transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        style={{ 
+                                                            color: deletingCompany === company.id ? '#999999' : '#FF4C4C', 
+                                                            cursor: deletingCompany === company.id ? 'not-allowed' : 'pointer' 
+                                                        }}
+                                                        onMouseEnter={(e) => deletingCompany !== company.id && (e.currentTarget.style.color = '#CC0000')}
+                                                        onMouseLeave={(e) => deletingCompany !== company.id && (e.currentTarget.style.color = '#FF4C4C')}
                                                     >
-                                                        Delete
+                                                        {deletingCompany === company.id ? 'Deleting...' : 'Delete'}
                                                     </button>
                                                 </td>
                                             </tr>
@@ -350,12 +374,16 @@ export default function AdminPage() {
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteUserClick(user.id)}
-                                                        className="transition-colors"
-                                                        style={{ color: '#FF4C4C', cursor: 'pointer' }}
-                                                        onMouseEnter={(e) => e.currentTarget.style.color = '#CC0000'}
-                                                        onMouseLeave={(e) => e.currentTarget.style.color = '#FF4C4C'}
+                                                        disabled={deletingUser === user.id}
+                                                        className="transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        style={{ 
+                                                            color: deletingUser === user.id ? '#999999' : '#FF4C4C', 
+                                                            cursor: deletingUser === user.id ? 'not-allowed' : 'pointer' 
+                                                        }}
+                                                        onMouseEnter={(e) => deletingUser !== user.id && (e.currentTarget.style.color = '#CC0000')}
+                                                        onMouseLeave={(e) => deletingUser !== user.id && (e.currentTarget.style.color = '#FF4C4C')}
                                                     >
-                                                        Delete
+                                                        {deletingUser === user.id ? 'Deleting...' : 'Delete'}
                                                     </button>
                                                 </td>
                                             </tr>
@@ -406,12 +434,16 @@ export default function AdminPage() {
                                     </button>
                                     <button
                                         type="submit"
-                                        className="px-4 py-2 text-white rounded-md transition-colors"
-                                        style={{ backgroundColor: '#FF6F3C', cursor: 'pointer' }}
-                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FF8F5C'}
-                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FF6F3C'}
+                                        disabled={submittingCompany}
+                                        className="px-4 py-2 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        style={{ 
+                                            backgroundColor: submittingCompany ? '#ccc' : '#FF6F3C', 
+                                            cursor: submittingCompany ? 'not-allowed' : 'pointer' 
+                                        }}
+                                        onMouseEnter={(e) => !submittingCompany && (e.currentTarget.style.backgroundColor = '#FF8F5C')}
+                                        onMouseLeave={(e) => !submittingCompany && (e.currentTarget.style.backgroundColor = '#FF6F3C')}
                                     >
-                                        {editingCompany ? 'Update' : 'Create'}
+                                        {submittingCompany ? (editingCompany ? 'Updating...' : 'Creating...') : (editingCompany ? 'Update' : 'Create')}
                                     </button>
                                 </div>
                             </form>
@@ -581,12 +613,16 @@ export default function AdminPage() {
                                     </button>
                                     <button
                                         type="submit"
-                                        className="px-4 py-2 text-white rounded-md transition-colors"
-                                        style={{ backgroundColor: '#FF6F3C', cursor: 'pointer' }}
-                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FF8F5C'}
-                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FF6F3C'}
+                                        disabled={submittingUser}
+                                        className="px-4 py-2 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        style={{ 
+                                            backgroundColor: submittingUser ? '#ccc' : '#FF6F3C', 
+                                            cursor: submittingUser ? 'not-allowed' : 'pointer' 
+                                        }}
+                                        onMouseEnter={(e) => !submittingUser && (e.currentTarget.style.backgroundColor = '#FF8F5C')}
+                                        onMouseLeave={(e) => !submittingUser && (e.currentTarget.style.backgroundColor = '#FF6F3C')}
                                     >
-                                        {editingUser ? 'Update' : 'Create'}
+                                        {submittingUser ? (editingUser ? 'Updating...' : 'Creating...') : (editingUser ? 'Update' : 'Create')}
                                     </button>
                                 </div>
                             </form>

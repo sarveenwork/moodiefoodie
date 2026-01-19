@@ -67,3 +67,26 @@ a.hover\:bg-orange-400:hover {
   min-height: 48px;
   min-width: 48px;
 }
+
+/* PWA Standalone Mode - Hide browser chrome */
+@media (display-mode: standalone) {
+  /* Additional styles for standalone mode if needed */
+  body {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* Prevent text selection on POS interface for better UX */
+.pos-page {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Allow text selection in specific areas */
+.pos-page input,
+.pos-page textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}

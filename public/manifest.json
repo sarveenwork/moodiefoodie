@@ -1,0 +1,40 @@
+{
+  "name": "MoodieFoodie POS",
+  "short_name": "MoodieFoodie",
+  "description": "Multi-tenant Point of Sale System",
+  "start_url": "/pos",
+  "display": "standalone",
+  "background_color": "#FFF8F0",
+  "theme_color": "#FF6F3C",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "/assets/MF.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/MF.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "food"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "POS",
+      "short_name": "POS",
+      "description": "Open Point of Sale",
+      "url": "/pos",
+      "icons": [
+        {
+          "src": "/assets/MF.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

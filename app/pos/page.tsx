@@ -34,6 +34,8 @@ export default function POSPage() {
     const [error, setError] = useState('');
     const [companyName, setCompanyName] = useState<string>('MoodieFoodie');
     const [activeTab, setActiveTab] = useState<'food' | 'drink'>('food');
+    const [signingOut, setSigningOut] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
 
     // Prevent body scrolling on POS page
     useEffect(() => {
@@ -42,6 +44,58 @@ export default function POSPage() {
             document.body.style.overflow = 'unset';
         };
     }, []);
+
+    // Fullscreen API handlers
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+        };
+    }, []);
+
+    async function handleEnterFullscreen() {
+        try {
+            const element = document.documentElement;
+            if (element.requestFullscreen) {
+                await element.requestFullscreen();
+            } else if ((element as any).webkitRequestFullscreen) {
+                await (element as any).webkitRequestFullscreen();
+            } else if ((element as any).mozRequestFullScreen) {
+                await (element as any).mozRequestFullScreen();
+            } else if ((element as any).msRequestFullscreen) {
+                await (element as any).msRequestFullscreen();
+            }
+        } catch (error) {
+            showError('Fullscreen not available');
+        }
+    }
+
+    async function handleExitFullscreen() {
+        try {
+            if (document.exitFullscreen) {
+                await document.exitFullscreen();
+            } else if ((document as any).webkitExitFullscreen) {
+                await (document as any).webkitExitFullscreen();
+            } else if ((document as any).mozCancelFullScreen) {
+                await (document as any).mozCancelFullScreen();
+            } else if ((document as any).msExitFullscreen) {
+                await (document as any).msExitFullscreen();
+            }
+        } catch (error) {
+            showError('Could not exit fullscreen');
+        }
+    }
 
     useEffect(() => {
         loadItems();
@@ -120,6 +174,8 @@ export default function POSPage() {
     }
 
     async function handlePay() {
+        if (processing) return; // Prevent spam clicks
+        
         if (cart.length === 0) {
             setError('Cart is empty');
             return;
@@ -165,12 +221,18 @@ export default function POSPage() {
     }
 
     async function handleSignOut() {
-        await signOut();
-        router.push('/login');
+        if (signingOut) return; // Prevent spam clicks
+        setSigningOut(true);
+        try {
+            await signOut();
+            router.push('/login');
+        } catch (error) {
+            setSigningOut(false);
+        }
     }
 
     return (
-        <div className="h-screen flex flex-col overflow-hidden" style={{ backgroundColor: '#FFF8F0' }}>
+        <div className="pos-page h-screen flex flex-col overflow-hidden" style={{ backgroundColor: '#FFF8F0' }}>
             {/* 
                 POS Layout Requirements:
                 - Tablet-first: Always uses left-right layout (never top/bottom stacking)
@@ -193,15 +255,44 @@ export default function POSPage() {
                     >
                         {companyName}
                     </button>
-                    <button
-                        onClick={handleSignOut}
-                        className="px-4 py-2 rounded-md text-sm font-medium transition-colors min-h-[48px] flex items-center"
-                        style={{ color: '#777777', cursor: 'pointer' }}
-                        onMouseEnter={(e) => e.currentTarget.style.color = '#333333'}
-                        onMouseLeave={(e) => e.currentTarget.style.color = '#777777'}
-                    >
-                        Sign Out
-                    </button>
+                    <div className="flex items-center space-x-2">
+                        {/* Fullscreen Toggle */}
+                        <button
+                            onClick={isFullscreen ? handleExitFullscreen : handleEnterFullscreen}
+                            className="px-4 py-2 rounded-md text-sm font-medium transition-colors min-h-[48px] flex items-center"
+                            style={{ 
+                                backgroundColor: '#F5F5F5',
+                                color: '#777777', 
+                                cursor: 'pointer' 
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E5E5E5'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#F5F5F5'}
+                            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                        >
+                            {isFullscreen ? (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            ) : (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                </svg>
+                            )}
+                        </button>
+                        <button
+                            onClick={handleSignOut}
+                            disabled={signingOut}
+                            className="px-4 py-2 rounded-md text-sm font-medium transition-colors min-h-[48px] flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{ 
+                                color: signingOut ? '#999999' : '#777777', 
+                                cursor: signingOut ? 'not-allowed' : 'pointer' 
+                            }}
+                            onMouseEnter={(e) => !signingOut && (e.currentTarget.style.color = '#333333')}
+                            onMouseLeave={(e) => !signingOut && (e.currentTarget.style.color = '#777777')}
+                        >
+                            {signingOut ? 'Signing out...' : 'Sign Out'}
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -210,8 +301,7 @@ export default function POSPage() {
                 {/* Left Panel - Items List (Scrollable) */}
                 <div className="flex flex-col overflow-hidden min-h-0">
                     <div className="flex-shrink-0 px-6 py-4 border-b" style={{ backgroundColor: '#ffffff', borderColor: '#e5e5e5' }}>
-                        <h2 className="text-2xl font-bold mb-4" style={{ color: '#333333' }}>Items</h2>
-                        {/* Category Tabs */}
+                        {/* Category Tabs - Only label, no "Items" heading */}
                         <div className="flex space-x-2">
                             <button
                                 onClick={() => setActiveTab('food')}
