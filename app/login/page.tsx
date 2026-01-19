@@ -23,16 +23,18 @@ export default function LoginPage() {
                 
                 if (user) {
                     // User is authenticated, check their role and redirect
-                    const { data: profile } = await supabase
-                        .from('users')
+                    const { data: profile } = await (supabase
+                        .from('users') as any)
                         .select('role')
                         .eq('id', user.id)
                         .single();
 
-                    if (profile?.role === 'super_admin') {
+                    if (profile && (profile as any).role === 'super_admin') {
                         router.replace('/admin');
-                    } else {
+                    } else if (profile) {
                         router.replace('/dashboard');
+                    } else {
+                        setCheckingAuth(false);
                     }
                 } else {
                     setCheckingAuth(false);
