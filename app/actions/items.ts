@@ -24,6 +24,7 @@ export async function createItem(formData: FormData) {
         const rawData = {
             name: formData.get('name') as string,
             price: parseFloat(formData.get('price') as string),
+            category: formData.get('category') as 'food' | 'drink',
             is_active: isActive,
         };
 
@@ -40,6 +41,7 @@ export async function createItem(formData: FormData) {
                 company_id: user.company_id,
                 name: sanitizedName,
                 price: validated.price,
+                category: validated.category,
                 is_active: validated.is_active,
                 created_by: user.id,
                 updated_by: user.id,
@@ -77,6 +79,7 @@ export async function updateItem(formData: FormData) {
             id: formData.get('id') as string,
             name: formData.get('name') as string,
             price: parseFloat(formData.get('price') as string),
+            category: formData.get('category') as 'food' | 'drink',
             is_active: isActive,
         };
 
@@ -92,6 +95,7 @@ export async function updateItem(formData: FormData) {
             .update({
                 name: sanitizedName,
                 price: validated.price,
+                category: validated.category,
                 is_active: validated.is_active,
                 updated_by: user.id,
             })

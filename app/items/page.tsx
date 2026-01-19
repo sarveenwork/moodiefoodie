@@ -10,6 +10,7 @@ interface Item {
     id: string;
     name: string;
     price: number;
+    category: 'food' | 'drink';
     is_active: boolean;
 }
 
@@ -21,10 +22,30 @@ export default function ItemsPage() {
     const [editingItem, setEditingItem] = useState<Item | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState<'food' | 'drink' | null>(null);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState<'all' | 'food' | 'drink'>('all');
 
     useEffect(() => {
         loadItems();
     }, []);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            const target = event.target as HTMLElement;
+            if (showDropdown && !target.closest('.relative')) {
+                setShowDropdown(false);
+            }
+        }
+        if (showDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => {
+                document.removeEventListener('mousedown', handleClickOutside);
+            };
+        }
+    }, [showDropdown]);
 
     async function loadItems() {
         setLoading(true);
@@ -45,6 +66,7 @@ export default function ItemsPage() {
         if (result.success) {
             setShowModal(false);
             setEditingItem(null);
+            setSelectedCategory(null);
             showSuccess(editingItem ? 'Item updated successfully' : 'Item created successfully');
             loadItems();
         } else {
@@ -74,28 +96,180 @@ export default function ItemsPage() {
         setItemToDelete(null);
     }
 
+    // Filter items based on search term and category
+    const filteredItems = items.filter((item) => {
+        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
+        return matchesSearch && matchesCategory;
+    });
+
     return (
         <div className="min-h-screen" style={{ backgroundColor: '#FFF8F0' }}>
             <Navbar />
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-bold" style={{ color: '#333333' }}>Items</h1>
-                    <button
-                        onClick={() => {
-                            setEditingItem(null);
-                            setShowModal(true);
-                        }}
-                        className="text-white px-4 py-2 rounded-md transition-colors"
-                        style={{ backgroundColor: '#FF6F3C', cursor: 'pointer' }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FF8F5C'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FF6F3C'}
-                    >
-                        Create Item
-                    </button>
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowDropdown(!showDropdown)}
+                            className="text-white px-4 py-2 rounded-md transition-colors flex items-center"
+                            style={{ backgroundColor: '#FF6F3C', cursor: 'pointer' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FF8F5C'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FF6F3C'}
+                        >
+                            Create Item
+                            <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {showDropdown && (
+                            <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg z-10" style={{ backgroundColor: '#ffffff' }}>
+                                <div className="py-1">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedCategory('food');
+                                            setEditingItem(null);
+                                            setShowModal(true);
+                                            setShowDropdown(false);
+                                        }}
+                                        className="block w-full text-left px-4 py-2 text-sm transition-colors"
+                                        style={{ color: '#333333', cursor: 'pointer' }}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F5F5F5'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                                    >
+                                        Add Food
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setSelectedCategory('drink');
+                                            setEditingItem(null);
+                                            setShowModal(true);
+                                            setShowDropdown(false);
+                                        }}
+                                        className="block w-full text-left px-4 py-2 text-sm transition-colors"
+                                        style={{ color: '#333333', cursor: 'pointer' }}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F5F5F5'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                                    >
+                                        Add Drink
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Search and Filter Controls */}
+                <div className="mb-6 bg-white rounded-lg shadow p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Search Input */}
+                        <div>
+                            <label className="block text-sm font-medium mb-2" style={{ color: '#333333' }}>
+                                Search Items
+                            </label>
+                            <input
+                                type="text"
+                                placeholder="Search by item name..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                                style={{ color: '#333333' }}
+                            />
+                        </div>
+                        {/* Category Filter */}
+                        <div>
+                            <label className="block text-sm font-medium mb-2" style={{ color: '#333333' }}>
+                                Filter by Category
+                            </label>
+                            <div className="flex space-x-2">
+                                <button
+                                    onClick={() => setCategoryFilter('all')}
+                                    className="px-4 py-2 rounded-md font-medium transition-colors"
+                                    style={categoryFilter === 'all' ? {
+                                        backgroundColor: '#FF6F3C',
+                                        color: '#ffffff',
+                                        cursor: 'pointer'
+                                    } : {
+                                        backgroundColor: '#F5F5F5',
+                                        color: '#777777',
+                                        cursor: 'pointer'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (categoryFilter !== 'all') {
+                                            e.currentTarget.style.backgroundColor = '#E5E5E5';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (categoryFilter !== 'all') {
+                                            e.currentTarget.style.backgroundColor = '#F5F5F5';
+                                        }
+                                    }}
+                                >
+                                    All
+                                </button>
+                                <button
+                                    onClick={() => setCategoryFilter('food')}
+                                    className="px-4 py-2 rounded-md font-medium transition-colors"
+                                    style={categoryFilter === 'food' ? {
+                                        backgroundColor: '#FF6F3C',
+                                        color: '#ffffff',
+                                        cursor: 'pointer'
+                                    } : {
+                                        backgroundColor: '#F5F5F5',
+                                        color: '#777777',
+                                        cursor: 'pointer'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (categoryFilter !== 'food') {
+                                            e.currentTarget.style.backgroundColor = '#E5E5E5';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (categoryFilter !== 'food') {
+                                            e.currentTarget.style.backgroundColor = '#F5F5F5';
+                                        }
+                                    }}
+                                >
+                                    Food
+                                </button>
+                                <button
+                                    onClick={() => setCategoryFilter('drink')}
+                                    className="px-4 py-2 rounded-md font-medium transition-colors"
+                                    style={categoryFilter === 'drink' ? {
+                                        backgroundColor: '#FF6F3C',
+                                        color: '#ffffff',
+                                        cursor: 'pointer'
+                                    } : {
+                                        backgroundColor: '#F5F5F5',
+                                        color: '#777777',
+                                        cursor: 'pointer'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (categoryFilter !== 'drink') {
+                                            e.currentTarget.style.backgroundColor = '#E5E5E5';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (categoryFilter !== 'drink') {
+                                            e.currentTarget.style.backgroundColor = '#F5F5F5';
+                                        }
+                                    }}
+                                >
+                                    Drinks
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {loading ? (
                     <div className="text-center py-8">Loading...</div>
+                ) : filteredItems.length === 0 ? (
+                    <div className="bg-white shadow rounded-lg p-8 text-center" style={{ color: '#777777' }}>
+                        {searchTerm || categoryFilter !== 'all' 
+                            ? 'No items found matching your search criteria.' 
+                            : 'No items available'}
+                    </div>
                 ) : (
                     <div className="bg-white shadow rounded-lg overflow-hidden">
                         <table className="min-w-full divide-y divide-gray-200">
@@ -103,6 +277,9 @@ export default function ItemsPage() {
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                                         Name
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                        Category
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                                         Price
@@ -116,10 +293,24 @@ export default function ItemsPage() {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {items.map((item) => (
+                                {filteredItems.map((item) => (
                                     <tr key={item.id}>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                             {item.name}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                            <span
+                                                className="px-2 py-1 rounded-full text-xs font-medium capitalize"
+                                                style={item.category === 'food' ? {
+                                                    backgroundColor: '#FFF4E6',
+                                                    color: '#FF6F3C'
+                                                } : {
+                                                    backgroundColor: '#E6F3FF',
+                                                    color: '#0066CC'
+                                                }}
+                                            >
+                                                {item.category}
+                                            </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             RM {item.price.toFixed(2)}
@@ -181,6 +372,21 @@ export default function ItemsPage() {
                                 )}
                                 <div className="mb-4">
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Category
+                                    </label>
+                                    <select
+                                        name="category"
+                                        required
+                                        defaultValue={editingItem?.category || selectedCategory || ''}
+                                        className="w-full rounded-md border border-gray-300 px-3 py-2"
+                                    >
+                                        <option value="">Select category</option>
+                                        <option value="food">Food</option>
+                                        <option value="drink">Drink</option>
+                                    </select>
+                                </div>
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Item Name
                                     </label>
                                     <input
@@ -223,6 +429,7 @@ export default function ItemsPage() {
                                         onClick={() => {
                                             setShowModal(false);
                                             setEditingItem(null);
+                                            setSelectedCategory(null);
                                         }}
                                         className="px-4 py-2 border border-gray-300 rounded-md"
                                         style={{ cursor: 'pointer' }}

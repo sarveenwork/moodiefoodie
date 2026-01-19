@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 export default function Navbar() {
     const router = useRouter();
     const [userRole, setUserRole] = useState<string | null>(null);
+    const [companyName, setCompanyName] = useState<string>('MoodieFoodie');
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -21,13 +22,23 @@ export default function Navbar() {
             if (user) {
                 const { data: profile } = await (supabase
                     .from('users') as any)
-                    .select('role')
+                    .select('role, company_id, companies(name)')
                     .eq('id', user.id)
                     .single();
 
                 if (profile) {
                     setUserRole(profile.role);
+                    // Set company name if available
+                    if (profile.companies && profile.companies.name) {
+                        setCompanyName(profile.companies.name);
+                    } else {
+                        setCompanyName('MoodieFoodie');
+                    }
+                } else {
+                    setCompanyName('MoodieFoodie');
                 }
+            } else {
+                setCompanyName('MoodieFoodie');
             }
             setLoading(false);
         }
@@ -45,7 +56,15 @@ export default function Navbar() {
                 <div className="flex justify-between h-16">
                     <div className="flex">
                         <div className="flex-shrink-0 flex items-center">
-                            <h1 className="text-xl font-bold" style={{ color: '#333333' }}>MoodieFoodie</h1>
+                            <button
+                                onClick={() => router.push('/dashboard')}
+                                className="text-xl font-bold transition-colors"
+                                style={{ color: '#333333', cursor: 'pointer' }}
+                                onMouseEnter={(e) => e.currentTarget.style.color = '#FF6F3C'}
+                                onMouseLeave={(e) => e.currentTarget.style.color = '#333333'}
+                            >
+                                {companyName}
+                            </button>
                         </div>
                         <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                             {!loading && userRole !== 'super_admin' && (

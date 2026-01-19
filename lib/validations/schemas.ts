@@ -36,6 +36,7 @@ export const updateUserSchema = z.object({
 export const createItemSchema = z.object({
     name: z.string().min(1, 'Item name is required').max(255),
     price: z.number().positive('Price must be positive').max(999999.99),
+    category: z.enum(['food', 'drink'], { required_error: 'Category is required' }),
     is_active: z.boolean().default(true),
 });
 
@@ -43,6 +44,7 @@ export const updateItemSchema = z.object({
     id: z.string().uuid(),
     name: z.string().min(1, 'Item name is required').max(255),
     price: z.number().positive('Price must be positive').max(999999.99),
+    category: z.enum(['food', 'drink'], { required_error: 'Category is required' }),
     is_active: z.boolean(),
 });
 
