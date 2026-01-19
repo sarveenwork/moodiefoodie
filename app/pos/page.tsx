@@ -425,37 +425,75 @@ export default function POSPage() {
                                             style={{ backgroundColor: '#F5F5F5' }}
                                         >
                                             <div className="flex-1 min-w-0">
-                                                <p className="font-medium truncate" style={{ color: '#333333' }}>{item.name}</p>
-                                                <p className="text-sm" style={{ color: '#777777' }}>
+                                                {/* Item name - highest priority */}
+                                                <p className="font-semibold truncate text-base mb-0.5" style={{ color: '#333333' }}>{item.name}</p>
+                                                {/* Item price - secondary priority */}
+                                                <p className="text-sm font-medium" style={{ color: '#777777' }}>
                                                     RM {item.price.toFixed(2)} × {item.quantity}
                                                 </p>
                                             </div>
-                                            <div className="flex items-center space-x-2 ml-2">
+                                            <div className="flex items-center space-x-1 ml-2">
                                                 <button
                                                     onClick={() => updateQuantity(item.item_id, -1)}
-                                                    className="w-12 h-12 rounded flex items-center justify-center font-bold transition-colors flex-shrink-0 text-xl"
-                                                    style={{ backgroundColor: '#e5e5e5', cursor: 'pointer' }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d4d4d4'}
-                                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#e5e5e5'}
+                                                    disabled={item.quantity <= 1}
+                                                    className="w-9 h-9 rounded-full flex items-center justify-center font-semibold transition-colors flex-shrink-0 text-base disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    style={{ 
+                                                        backgroundColor: item.quantity <= 1 ? '#f0f0f0' : '#e5e5e5', 
+                                                        color: item.quantity <= 1 ? '#999999' : '#666666',
+                                                        cursor: item.quantity <= 1 ? 'not-allowed' : 'pointer',
+                                                        minWidth: '36px',
+                                                        minHeight: '36px'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        if (item.quantity > 1) {
+                                                            e.currentTarget.style.backgroundColor = '#d4d4d4';
+                                                        }
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        if (item.quantity > 1) {
+                                                            e.currentTarget.style.backgroundColor = '#e5e5e5';
+                                                        }
+                                                    }}
+                                                    title="Decrease quantity"
                                                 >
                                                     −
                                                 </button>
-                                                <span className="w-12 text-center font-medium flex-shrink-0 text-lg" style={{ color: '#333333' }}>{item.quantity}</span>
+                                                <span className="w-8 text-center font-medium flex-shrink-0 text-sm" style={{ color: '#777777', minWidth: '32px' }}>{item.quantity}</span>
                                                 <button
                                                     onClick={() => updateQuantity(item.item_id, 1)}
-                                                    className="w-12 h-12 rounded flex items-center justify-center font-bold transition-colors flex-shrink-0 text-xl"
-                                                    style={{ backgroundColor: '#e5e5e5', cursor: 'pointer' }}
+                                                    className="w-9 h-9 rounded-full flex items-center justify-center font-semibold transition-colors flex-shrink-0 text-base"
+                                                    style={{ 
+                                                        backgroundColor: '#e5e5e5', 
+                                                        color: '#666666',
+                                                        cursor: 'pointer',
+                                                        minWidth: '36px',
+                                                        minHeight: '36px'
+                                                    }}
                                                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d4d4d4'}
                                                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#e5e5e5'}
+                                                    title="Increase quantity"
                                                 >
                                                     +
                                                 </button>
                                                 <button
                                                     onClick={() => removeFromCart(item.item_id)}
-                                                    className="ml-2 transition-colors flex-shrink-0 w-12 h-12 flex items-center justify-center text-2xl font-bold"
-                                                    style={{ color: '#FF4C4C', cursor: 'pointer' }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.color = '#CC0000'}
-                                                    onMouseLeave={(e) => e.currentTarget.style.color = '#FF4C4C'}
+                                                    className="ml-1 transition-colors flex-shrink-0 w-9 h-9 flex items-center justify-center text-lg font-semibold rounded-full"
+                                                    style={{ 
+                                                        backgroundColor: '#f0f0f0',
+                                                        color: '#FF4C4C', 
+                                                        cursor: 'pointer',
+                                                        minWidth: '36px',
+                                                        minHeight: '36px'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.backgroundColor = '#ffe5e5';
+                                                        e.currentTarget.style.color = '#CC0000';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.backgroundColor = '#f0f0f0';
+                                                        e.currentTarget.style.color = '#FF4C4C';
+                                                    }}
+                                                    title="Remove item"
                                                 >
                                                     ×
                                                 </button>
