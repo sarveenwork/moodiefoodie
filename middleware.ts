@@ -7,7 +7,9 @@ export async function middleware(request: NextRequest) {
 
     if (!supabaseUrl || !supabaseAnonKey) {
         console.error('Missing Supabase environment variables in middleware');
-        return NextResponse.redirect(new URL('/login', request.url));
+        const url = request.nextUrl.clone();
+        url.pathname = '/login';
+        return NextResponse.redirect(url);
     }
 
     let response = NextResponse.next({
@@ -43,51 +45,90 @@ export async function middleware(request: NextRequest) {
 
     const { pathname } = request.nextUrl;
 
+    // Create URL helpers to avoid redirect loops
+    const createRedirectUrl = (path: string) => {
+        const url = request.nextUrl.clone();
+        url.pathname = path;
+        return url;
+    };
+
+    // CRITICAL: Never redirect to /login if we're already on /login (prevents loops)
+    const redirectToLogin = () => {
+        if (pathname === '/login') {
+            // Already on login page - don't redirect, just allow through
+            return response;
+        }
+        return NextResponse.redirect(createRedirectUrl('/login'));
+    };
+
     // Public routes that don't require authentication
-    // Allow these routes to be accessed without authentication
     const publicRoutes = ['/login', '/unauthorized'];
     
-    if (publicRoutes.includes(pathname)) {
-        // If user is authenticated and tries to access login, redirect them to dashboard
-        // This prevents authenticated users from staying on login page
-        if (user && pathname === '/login') {
-            // Check user profile to determine redirect destination
+    // Handle /login route specifically
+    if (pathname === '/login') {
+        // If user is authenticated, redirect them away from login page
+        if (user) {
             try {
-                const { data: profile } = await supabase
+                const { data: profile, error: profileError } = await supabase
                     .from('users')
                     .select('role')
                     .eq('id', user.id)
                     .single();
 
-                if (profile?.role === 'super_admin') {
-                    return NextResponse.redirect(new URL('/admin', request.url));
-                } else {
-                    return NextResponse.redirect(new URL('/dashboard', request.url));
+                // Only redirect if we successfully got the profile
+                if (profile && !profileError) {
+                    if (profile.role === 'super_admin') {
+                        return NextResponse.redirect(createRedirectUrl('/admin'));
+                    } else {
+                        return NextResponse.redirect(createRedirectUrl('/dashboard'));
+                    }
                 }
+                // If profile check fails, allow through to prevent loops
+                // User can still see login page even if authenticated (edge case)
             } catch (error) {
-                // If profile check fails, redirect to dashboard as default
-                return NextResponse.redirect(new URL('/dashboard', request.url));
+                // On any error, allow through to prevent loops
+                console.error('Error checking profile for authenticated user on /login:', error);
             }
         }
-        // Allow unauthenticated users to access public routes
+        // Unauthenticated user or profile check failed - allow through
         return response;
     }
 
-    // Handle root path - redirect based on auth status
+    // Handle /unauthorized route
+    if (pathname === '/unauthorized') {
+        return response;
+    }
+
+    // Handle root path
     if (pathname === '/') {
         if (!user) {
-            return NextResponse.redirect(new URL('/login', request.url));
+            return redirectToLogin();
         }
-        // Let the page.tsx handle the redirect to /dashboard
-        return response;
+        // Authenticated user at root - check their role and redirect appropriately
+        try {
+            const { data: profile } = await supabase
+                .from('users')
+                .select('role')
+                .eq('id', user.id)
+                .single();
+
+            if (profile?.role === 'super_admin') {
+                return NextResponse.redirect(createRedirectUrl('/admin'));
+            } else {
+                return NextResponse.redirect(createRedirectUrl('/dashboard'));
+            }
+        } catch (error) {
+            // If profile check fails, default to dashboard
+            return NextResponse.redirect(createRedirectUrl('/dashboard'));
+        }
     }
 
     // Protected routes - redirect to login if not authenticated
     if (!user) {
-        return NextResponse.redirect(new URL('/login', request.url));
+        return redirectToLogin();
     }
 
-    // Check user profile exists
+    // For protected routes, check user profile exists
     let profile;
     try {
         const { data, error: profileError } = await supabase
@@ -98,40 +139,50 @@ export async function middleware(request: NextRequest) {
 
         if (profileError) {
             console.error('Profile fetch error:', profileError);
-            // If it's a network/database error, don't redirect (would cause loop)
-            // Allow the request through and let the page handle it
+            // If it's a not found error, redirect to login (but only if not already on login)
             if (profileError.code === 'PGRST116' || profileError.message?.includes('not found')) {
-                // Profile truly doesn't exist - redirect to login
-                return NextResponse.redirect(new URL('/login', request.url));
+                return redirectToLogin();
             }
-            // Other errors - allow through
+            // For other errors (network, etc.), allow through to prevent loops
+            // The page component will handle the error
             return response;
         }
 
         profile = data;
         if (!profile) {
-            return NextResponse.redirect(new URL('/login', request.url));
+            // Profile doesn't exist - redirect to login (but only if not already on login)
+            return redirectToLogin();
         }
     } catch (error) {
         console.error('Error checking profile:', error);
         // On error, allow request through to prevent loops
+        // The page component will handle the error
         return response;
     }
 
-    // Super admin routes
+    const userRole = (profile as any).role;
+
+    // Super admin routes - only super_admin can access
     if (pathname.startsWith('/admin')) {
-        if ((profile as any).role !== 'super_admin') {
-            return NextResponse.redirect(new URL('/unauthorized', request.url));
+        if (userRole !== 'super_admin') {
+            return NextResponse.redirect(createRedirectUrl('/unauthorized'));
         }
+        // Super admin is accessing /admin - allow through
+        return response;
     }
 
-    // Company admin only routes - super admin should not access these
-    if (pathname.startsWith('/pos') || pathname.startsWith('/dashboard') || pathname.startsWith('/items') || pathname.startsWith('/orders') || pathname.startsWith('/reports')) {
-        if ((profile as any).role === 'super_admin') {
-            return NextResponse.redirect(new URL('/admin', request.url));
+    // Company admin only routes - super admin should be redirected to /admin
+    const companyAdminRoutes = ['/pos', '/dashboard', '/items', '/orders', '/reports'];
+    if (companyAdminRoutes.some(route => pathname.startsWith(route))) {
+        if (userRole === 'super_admin') {
+            // Super admin trying to access company admin route - redirect to admin
+            return NextResponse.redirect(createRedirectUrl('/admin'));
         }
+        // Company admin accessing their routes - allow through
+        return response;
     }
 
+    // All other protected routes - allow through
     return response;
 }
 
