@@ -24,15 +24,15 @@ export async function createCompany(formData: FormData) {
         const validated = createCompanySchema.parse(rawData);
         const sanitizedName = sanitizeString(validated.name);
 
-        const supabase = await createClient();
+        // Use admin client for super admin operations to avoid type inference issues
+        const adminClient = createAdminClient();
 
-        // Type assertion to fix TypeScript inference issue with Supabase insert
-        const { data, error } = await supabase
+        const { data, error } = await adminClient
             .from('companies')
             .insert({
                 name: sanitizedName,
                 created_by: user.id,
-            } as Database['public']['Tables']['companies']['Insert'])
+            })
             .select()
             .single();
 
@@ -62,8 +62,9 @@ export async function updateCompany(formData: FormData) {
         const validated = updateCompanySchema.parse(rawData);
         const sanitizedName = sanitizeString(validated.name);
 
-        const supabase = await createClient();
-        const { data, error } = await supabase
+        // Use admin client for super admin operations
+        const adminClient = createAdminClient();
+        const { data, error } = await adminClient
             .from('companies')
             .update({
                 name: sanitizedName,
@@ -90,8 +91,9 @@ export async function getCompanies() {
     try {
         await requireSuperAdmin();
 
-        const supabase = await createClient();
-        const { data, error } = await supabase
+        // Use admin client for super admin operations
+        const adminClient = createAdminClient();
+        const { data, error } = await adminClient
             .from('companies')
             .select('*')
             .is('deleted_at', null)
@@ -295,8 +297,9 @@ export async function deleteCompany(formData: FormData) {
             throw new Error('Company ID is required');
         }
 
-        const supabase = await createClient();
-        const { error } = await supabase
+        // Use admin client for super admin operations
+        const adminClient = createAdminClient();
+        const { error } = await adminClient
             .from('companies')
             .update({
                 deleted_at: new Date().toISOString(),
