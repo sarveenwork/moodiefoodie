@@ -214,15 +214,13 @@ export default function POSPage() {
         setError('');
         const existingItem = cart.find((ci) => ci.item_id === item.id);
         if (existingItem) {
-            setCart(
-                cart.map((ci) =>
-                    ci.item_id === item.id
-                        ? { ...ci, quantity: ci.quantity + 1 }
-                        : ci
-                )
-            );
+            // Move existing item to front and update quantity
+            const updatedItem = { ...existingItem, quantity: existingItem.quantity + 1 };
+            const otherItems = cart.filter((ci) => ci.item_id !== item.id);
+            setCart([updatedItem, ...otherItems]);
         } else {
-            setCart([...cart, { item_id: item.id, name: item.name, price: item.price, quantity: 1 }]);
+            // Add new item at the beginning
+            setCart([{ item_id: item.id, name: item.name, price: item.price, quantity: 1 }, ...cart]);
         }
     }
 
